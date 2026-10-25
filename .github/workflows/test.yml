@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run standard-library tests
+        run: python -B -m unittest discover -s tests -v
+
+  isolated-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Stage public source and run offline isolation checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage_dir=$(mktemp -d /tmp/csv-contract-check-ci.XXXXXX)
+          trap 'rm -rf "$stage_dir"' EXIT
+          mkdir "$stage_dir/project"
+          chmod 755 "$stage_dir" "$stage_dir/project"
+          git archive HEAD | tar -xf - -C "$stage_dir/project"
+          if command -v bwrap >/dev/null 2>&1; then
+            bubblewrap_path=$(command -v bwrap)
+          else
+            mkdir "$stage_dir/tools"
+            (
+              cd "$stage_dir/tools"
+              apt-get download bubblewrap
+              dpkg-deb -x ./*.deb extracted
+            )
+            bubblewrap_path="$stage_dir/tools/extracted/usr/bin/bwrap"
+          fi
+          /usr/bin/python3 -B "$stage_dir/project/scripts/test_isolated.py" \
+            "$stage_dir/project" --bwrap "$bubblewrap_path" --allow-github-sudo

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "columns": [
+    {"name": "id", "type": "integer", "required": true},
+    {"name": "name", "type": "string", "required": true},
+    {"name": "active", "type": "boolean", "required": true},
+    {"name": "score", "type": "number"}
+  ]
+}
